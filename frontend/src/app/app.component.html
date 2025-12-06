@@ -1,0 +1,88 @@
+<div class="container">
+  <header>
+    <h1>{{ title }}</h1>
+    <p>Sustav za dohvaćanje, obradu i prikaz podataka</p>
+  </header>
+
+  <div class="controls">
+    <div class="button-group">
+      <button class="btn-primary" (click)="fetchData()" [disabled]="loading">
+        {{ loading ? 'Dohvaćam...' : 'Dohvati Podatke' }}
+      </button>
+      <button class="btn-secondary" (click)="loadData()" [disabled]="loading">
+        Prikaži Podatke
+      </button>
+    </div>
+
+    <div class="filters">
+      <div class="filter-group">
+        <label for="filterNaziv">Filter po nazivu:</label>
+        <input 
+          type="text" 
+          id="filterNaziv"
+          [(ngModel)]="filterNaziv" 
+          placeholder="Unesite naziv..."
+          (keyup.enter)="loadData()"
+        />
+      </div>
+      
+      <div class="filter-group">
+        <label for="filterGrad">Filter po gradu:</label>
+        <input 
+          type="text" 
+          id="filterGrad"
+          [(ngModel)]="filterGrad" 
+          placeholder="Unesite grad..."
+          (keyup.enter)="loadData()"
+        />
+      </div>
+      
+      <button class="btn-warning" (click)="clearFilters()" [disabled]="loading">
+        Očisti Filtere
+      </button>
+    </div>
+  </div>
+
+  <div class="alert alert-success" *ngIf="message">
+    {{ message }}
+  </div>
+
+  <div class="alert alert-error" *ngIf="error">
+    {{ error }}
+  </div>
+
+  <div class="loading" *ngIf="loading">
+    Učitavanje podataka...
+  </div>
+
+  <div class="data-section" *ngIf="!loading">
+    <h2>Podaci ({{ data.length }} zapisa)</h2>
+    
+    <div class="no-data" *ngIf="data.length === 0">
+      Nema dostupnih podataka. Kliknite "Dohvati Podatke" za početak.
+    </div>
+
+    <table *ngIf="data.length > 0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Naziv</th>
+          <th>Grad</th>
+          <th>Kategorija</th>
+          <th>Cijena (€)</th>
+          <th>Datum</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of data">
+          <td>{{ item.id }}</td>
+          <td>{{ item.naziv }}</td>
+          <td>{{ item.grad }}</td>
+          <td>{{ item.kategorija }}</td>
+          <td>{{ item.cijena | number:'1.2-2' }}</td>
+          <td>{{ item.datum ? (item.datum | date:'short') : '-' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
