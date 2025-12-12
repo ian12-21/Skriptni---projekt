@@ -1,16 +1,38 @@
 <div class="container">
   <header>
     <h1>{{ title }}</h1>
-    <p>Sustav za dohvaćanje, obradu i prikaz podataka</p>
+    <p>Sustav za dohvaćanje, obradu i prikaz podataka s dnevnom rotacijom</p>
+    
+    <!-- Harvester Status -->
+    <div class="harvester-status" *ngIf="harvesterStatus">
+      <span class="status-badge" [class.active]="harvesterStatus.running">
+        {{ harvesterStatus.running ? '🟢 Harvester aktivan' : '🔴 Harvester neaktivan' }}
+      </span>
+      <span class="status-info" *ngIf="harvesterStatus.lastRun">
+        Zadnje dohvaćanje: {{ formatDate(harvesterStatus.lastRun) }}
+      </span>
+      <span class="status-info" *ngIf="harvesterStatus.nextRun">
+        Sljedeće: {{ formatDate(harvesterStatus.nextRun) }}
+      </span>
+      <span class="status-info">
+        Interval: {{ formatInterval(harvesterStatus.interval) }}
+      </span>
+    </div>
   </header>
 
   <div class="controls">
     <div class="button-group">
-      <button class="btn-primary" (click)="fetchData()" [disabled]="loading">
-        {{ loading ? 'Dohvaćam...' : 'Dohvati Podatke' }}
+      <button class="btn-primary" (click)="triggerHarvest()" [disabled]="loading">
+        {{ loading ? 'Dohvaćam...' : '🔄 Ručno Dohvaćanje' }}
       </button>
       <button class="btn-secondary" (click)="loadData()" [disabled]="loading">
-        Prikaži Podatke
+        📊 Prikaži Podatke
+      </button>
+      <button class="btn-info" (click)="toggleStats()">
+        {{ showStats ? '📉 Sakrij Statistike' : '📈 Prikaži Statistike' }}
+      </button>
+      <button class="btn-success" (click)="exportCSV()" [disabled]="data.length === 0">
+        💾 Export CSV
       </button>
     </div>
 
@@ -38,28 +60,66 @@
       </div>
       
       <button class="btn-warning" (click)="clearFilters()" [disabled]="loading">
-        Očisti Filtere
+        🔄 Očisti Filtere
       </button>
     </div>
   </div>
 
+  <!-- Statistike -->
+  <div class="stats-section" *ngIf="showStats && stats">
+    <h2>📊 Statistike</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.stats.totalRecords }}</div>
+        <div class="stat-label">Ukupno zapisa</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.stats.avgCijena | number:'1.2-2' }}€</div>
+        <div class="stat-label">Prosječna cijena</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.stats.minCijena | number:'1.2-2' }}€</div>
+        <div class="stat-label">Min cijena</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.stats.maxCijena | number:'1.2-2' }}€</div>
+        <div class="stat-label">Max cijena</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.stats.uniqueGradovi }}</div>
+        <div class="stat-label">Gradova</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.stats.uniqueNazivi }}</div>
+        <div class="stat-label">Trgovina</div>
+      </div>
+    </div>
+    
+    <div class="available-dates" *ngIf="availableDates.length > 0">
+      <h3>📅 Dostupni datumi spremljenih podataka:</h3>
+      <div class="dates-list">
+        <span class="date-badge" *ngFor="let date of availableDates">{{ date }}</span>
+      </div>
+    </div>
+  </div>
+
   <div class="alert alert-success" *ngIf="message">
-    {{ message }}
+    ✅ {{ message }}
   </div>
 
   <div class="alert alert-error" *ngIf="error">
-    {{ error }}
+    ❌ {{ error }}
   </div>
 
   <div class="loading" *ngIf="loading">
-    Učitavanje podataka...
+    ⏳ Učitavanje podataka...
   </div>
 
   <div class="data-section" *ngIf="!loading">
-    <h2>Podaci ({{ data.length }} zapisa)</h2>
+    <h2>📋 Podaci ({{ data.length }} zapisa)</h2>
     
     <div class="no-data" *ngIf="data.length === 0">
-      Nema dostupnih podataka. Kliknite "Dohvati Podatke" za početak.
+      Nema dostupnih podataka. Harvester će automatski dohvatiti podatke.
     </div>
 
     <table *ngIf="data.length > 0">
