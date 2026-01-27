@@ -1,21 +1,20 @@
 <div class="container">
   <header>
-    <h1>{{ title }}</h1>
-    <p>Sustav za dohvaćanje, obradu i prikaz podataka s dnevnom rotacijom</p>
+    <h1>🛒 {{ title }}</h1>
+    <p>Dnevne arhive cijena iz hrvatskih trgovina</p>
     
-    <!-- Harvester Status -->
     <div class="harvester-status" *ngIf="harvesterStatus">
       <span class="status-badge" [class.active]="harvesterStatus.running">
         {{ harvesterStatus.running ? '🟢 Harvester aktivan' : '🔴 Harvester neaktivan' }}
       </span>
-      <span class="status-info" *ngIf="harvesterStatus.lastRun">
-        Zadnje dohvaćanje: {{ formatDate(harvesterStatus.lastRun) }}
+      <span class="status-badge fetching" *ngIf="harvesterStatus.currentlyFetching">
+        ⏳ Preuzimanje u tijeku...
       </span>
-      <span class="status-info" *ngIf="harvesterStatus.nextRun">
-        Sljedeće: {{ formatDate(harvesterStatus.nextRun) }}
+      <span class="status-info" *ngIf="archiveDate">
+        📅 Podaci: {{ archiveDate }}
       </span>
-      <span class="status-info">
-        Interval: {{ formatInterval(harvesterStatus.interval) }}
+      <span class="status-info" *ngIf="harvesterStatus.lastResult && harvesterStatus.lastResult.records">
+        📊 {{ harvesterStatus.lastResult.records | number }} zapisa
       </span>
     </div>
   </header>
@@ -23,13 +22,16 @@
   <div class="controls">
     <div class="button-group">
       <button class="btn-primary" (click)="triggerHarvest()" [disabled]="loading">
-        {{ loading ? 'Dohvaćam...' : '🔄 Ručno Dohvaćanje' }}
+        {{ loading ? '⏳ Preuzimanje...' : '📥 Dohvati s cijene.dev' }}
       </button>
       <button class="btn-secondary" (click)="loadData()" [disabled]="loading">
-        📊 Prikaži Podatke
+        🔄 Osvježi
       </button>
       <button class="btn-info" (click)="toggleStats()">
-        {{ showStats ? '📉 Sakrij Statistike' : '📈 Prikaži Statistike' }}
+        {{ showStats ? '📉 Sakrij statistike' : '📊 Statistike' }}
+      </button>
+      <button class="btn-purple" (click)="toggleArchives()">
+        {{ showArchives ? '📁 Sakrij arhive' : '📁 Dostupne arhive' }}
       </button>
       <button class="btn-success" (click)="exportCSV()" [disabled]="data.length === 0">
         💾 Export CSV
@@ -37,31 +39,53 @@
     </div>
 
     <div class="filters">
-      <div class="filter-group">
-        <label for="filterNaziv">Filter po nazivu:</label>
-        <input 
-          type="text" 
-          id="filterNaziv"
-          [(ngModel)]="filterNaziv" 
-          placeholder="Unesite naziv..."
-          (keyup.enter)="loadData()"
-        />
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Naziv proizvoda:</label>
+          <input type="text" [(ngModel)]="filterNaziv" placeholder="Pretraži..." (keyup.enter)="applyFilters()"/>
+        </div>
+        
+        <div class="filter-group">
+          <label>Trgovina:</label>
+          <select [(ngModel)]="filterTrgovina" (change)="applyFilters()">
+            <option value="">Sve trgovine</option>
+            <option *ngFor="let t of trgovine" [value]="t">{{ t }}</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label>Kategorija:</label>
+          <select [(ngModel)]="filterKategorija" (change)="applyFilters()">
+            <option value="">Sve kategorije</option>
+            <option *ngFor="let k of kategorije" [value]="k">{{ k }}</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label>Brand:</label>
+          <input type="text" [(ngModel)]="filterBrand" placeholder="Marka..." (keyup.enter)="applyFilters()"/>
+        </div>
       </div>
       
-      <div class="filter-group">
-        <label for="filterGrad">Filter po gradu:</label>
-        <input 
-          type="text" 
-          id="filterGrad"
-          [(ngModel)]="filterGrad" 
-          placeholder="Unesite grad..."
-          (keyup.enter)="loadData()"
-        />
+      <div class="filter-row">
+        <div class="filter-group small">
+          <label>Min cijena (€):</label>
+          <input type="number" [(ngModel)]="minCijena" placeholder="0" (keyup.enter)="applyFilters()"/>
+        </div>
+        
+        <div class="filter-group small">
+          <label>Max cijena (€):</label>
+          <input type="number" [(ngModel)]="maxCijena" placeholder="1000" (keyup.enter)="applyFilters()"/>
+        </div>
+        
+        <div class="filter-group">
+          <label>Grad:</label>
+          <input type="text" [(ngModel)]="filterGrad" placeholder="Grad..." (keyup.enter)="applyFilters()"/>
+        </div>
+        
+        <button class="btn-primary" (click)="applyFilters()" [disabled]="loading">🔍 Pretraži</button>
+        <button class="btn-warning" (click)="clearFilters()" [disabled]="loading">✖ Očisti</button>
       </div>
-      
-      <button class="btn-warning" (click)="clearFilters()" [disabled]="loading">
-        🔄 Očisti Filtere
-      </button>
     </div>
   </div>
 
@@ -69,80 +93,108 @@
   <div class="stats-section" *ngIf="showStats && stats">
     <h2>📊 Statistike</h2>
     <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value">{{ stats.stats.totalRecords }}</div>
+      <div class="stat-card blue">
+        <div class="stat-value">{{ stats.stats.totalRecords | number }}</div>
         <div class="stat-label">Ukupno zapisa</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ stats.stats.avgCijena | number:'1.2-2' }}€</div>
+      <div class="stat-card green">
+        <div class="stat-value">{{ stats.stats.avgCijena | number:'1.2-2' }} €</div>
         <div class="stat-label">Prosječna cijena</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ stats.stats.minCijena | number:'1.2-2' }}€</div>
-        <div class="stat-label">Min cijena</div>
+      <div class="stat-card red">
+        <div class="stat-value">{{ stats.stats.minCijena | number:'1.2-2' }} €</div>
+        <div class="stat-label">Najniža cijena</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ stats.stats.maxCijena | number:'1.2-2' }}€</div>
-        <div class="stat-label">Max cijena</div>
+      <div class="stat-card orange">
+        <div class="stat-value">{{ stats.stats.maxCijena | number:'1.2-2' }} €</div>
+        <div class="stat-label">Najviša cijena</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ stats.stats.uniqueGradovi }}</div>
-        <div class="stat-label">Gradova</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ stats.stats.uniqueNazivi }}</div>
+      <div class="stat-card purple">
+        <div class="stat-value">{{ stats.stats.uniqueTrgovine }}</div>
         <div class="stat-label">Trgovina</div>
       </div>
+      <div class="stat-card teal">
+        <div class="stat-value">{{ stats.stats.uniqueKategorije }}</div>
+        <div class="stat-label">Kategorija</div>
+      </div>
     </div>
     
-    <div class="available-dates" *ngIf="availableDates.length > 0">
-      <h3>📅 Dostupni datumi spremljenih podataka:</h3>
-      <div class="dates-list">
-        <span class="date-badge" *ngFor="let date of availableDates">{{ date }}</span>
+    <div class="info-box" *ngIf="stats.availableDates && stats.availableDates.length > 0">
+      <h3>📅 Lokalno spremljeni datumi:</h3>
+      <div class="tags">
+        <span class="tag" *ngFor="let date of stats.availableDates">{{ date }}</span>
       </div>
     </div>
   </div>
 
-  <div class="alert alert-success" *ngIf="message">
-    ✅ {{ message }}
+  <!-- Arhive -->
+  <div class="archives-section" *ngIf="showArchives">
+    <h2>📁 Dostupne arhive na cijene.dev</h2>
+    <div class="archives-list" *ngIf="archives && archives.length > 0">
+      <div class="archive-item" *ngFor="let archive of archives">
+        <span class="archive-date">📅 {{ archive.date }}</span>
+        <span class="archive-size">{{ formatBytes(archive.size) }}</span>
+        <a [href]="archive.url" target="_blank" class="archive-link">⬇️ Preuzmi ZIP</a>
+      </div>
+    </div>
+    <div class="loading-text" *ngIf="!archives || archives.length === 0">Učitavanje...</div>
   </div>
 
-  <div class="alert alert-error" *ngIf="error">
-    ❌ {{ error }}
-  </div>
-
-  <div class="loading" *ngIf="loading">
-    ⏳ Učitavanje podataka...
-  </div>
+  <div class="alert alert-success" *ngIf="message">✅ {{ message }}</div>
+  <div class="alert alert-error" *ngIf="error">❌ {{ error }}</div>
+  <div class="loading-overlay" *ngIf="loading">⏳ Učitavanje podataka...</div>
 
   <div class="data-section" *ngIf="!loading">
-    <h2>📋 Podaci ({{ data.length }} zapisa)</h2>
+    <div class="data-header">
+      <h2>📋 Proizvodi <span class="count">({{ totalRecords | number }})</span></h2>
+      
+      <div class="pagination" *ngIf="totalPages > 1">
+        <button class="btn-page" (click)="prevPage()" [disabled]="currentPage === 1">← Prethodna</button>
+        <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
+        <button class="btn-page" (click)="nextPage()" [disabled]="currentPage === totalPages">Sljedeća →</button>
+      </div>
+    </div>
     
     <div class="no-data" *ngIf="data.length === 0">
-      Nema dostupnih podataka. Harvester će automatski dohvatiti podatke.
+      Nema podataka. Kliknite "Dohvati s cijene.dev" za preuzimanje.
     </div>
 
-    <table *ngIf="data.length > 0">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Naziv</th>
-          <th>Grad</th>
-          <th>Kategorija</th>
-          <th>Cijena (€)</th>
-          <th>Datum</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let item of data">
-          <td>{{ item.id }}</td>
-          <td>{{ item.naziv }}</td>
-          <td>{{ item.grad }}</td>
-          <td>{{ item.kategorija }}</td>
-          <td>{{ item.cijena | number:'1.2-2' }}</td>
-          <td>{{ item.datum ? (item.datum | date:'short') : '-' }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="table-container" *ngIf="data && data.length > 0">
+      <table>
+        <thead>
+          <tr>
+            <th>Naziv</th>
+            <th>Trgovina</th>
+            <th>Kategorija</th>
+            <th>Brand</th>
+            <th>Cijena</th>
+            <th>Jed. cijena</th>
+            <th>Najbolja 30d</th>
+            <th>Jedinica</th>
+            <th>Grad</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of data">
+            <td class="naziv-cell" [title]="item.naziv">{{ item.naziv }}</td>
+            <td><span class="trgovina-badge">{{ item.trgovina }}</span></td>
+            <td>{{ item.kategorija }}</td>
+            <td>{{ item.brand || '-' }}</td>
+            <td class="cijena-cell">{{ formatCijena(item.cijena) }}</td>
+            <td>{{ formatCijena(item.cijena_jedinicna) }}</td>
+            <td class="best-price" *ngIf="item.najbolja_cijena_30">{{ formatCijena(item.najbolja_cijena_30) }}</td>
+            <td *ngIf="!item.najbolja_cijena_30">-</td>
+            <td>{{ item.jedinica }} {{ item.kolicina }}</td>
+            <td>{{ item.grad || '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="pagination bottom" *ngIf="totalPages > 1 && data && data.length > 0">
+      <button class="btn-page" (click)="prevPage()" [disabled]="currentPage === 1">← Prethodna</button>
+      <span class="page-info">Stranica {{ currentPage }} od {{ totalPages }}</span>
+      <button class="btn-page" (click)="nextPage()" [disabled]="currentPage === totalPages">Sljedeća →</button>
+    </div>
   </div>
 </div>
