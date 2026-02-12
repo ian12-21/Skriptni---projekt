@@ -383,7 +383,7 @@ function loadDataByDate(dateStr) {
   return fileContent.data || fileContent;
 }
 
-// Računanje statistika
+// Računanje statistika --> za aktivne trgovine 
 function calculateStats(data) {
   if (!data || data.length === 0) {
     return {
@@ -418,15 +418,15 @@ function calculateStats(data) {
 const ACTIVE_STORES = [
   'konzum',
   'spar', 
-  'dm',
+  'lidl',
   'plodine'
 ];
 
 // Lista svih trgovina (zakomentirane za buduće korištenje)
 const AVAILABLE_STORES = [
-  'Konzum', 'Spar', 'dm', 'Plodine',
+  'Konzum', 'Spar', 'Lidl', 'Plodine',
   // 'Studenac',
-  // 'Lidl',
+  // 'dm',
   // 'Tommy',
   // 'Kaufland',
   // 'Eurospin',

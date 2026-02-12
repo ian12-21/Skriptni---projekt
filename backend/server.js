@@ -362,13 +362,13 @@ process.on('SIGTERM', () => {
 app.listen(PORT, () => {
   dataService.log('info', `Server pokrenut na http://localhost:${PORT}`);
   dataService.log('info', `API: ${dataService.CONFIG.API_URL}`);
-  console.log(`\nAPI Endpointi:`);
-  console.log(`  GET  /api/health        - Status servera`);
-  console.log(`  GET  /api/archives      - Popis dostupnih arhiva s cijene.dev`);
-  console.log(`  GET  /api/stores        - Lista trgovina`);
-  console.log(`  GET  /api/latest        - Najnoviji lokalni podaci`);
-  console.log(`  GET  /api/archive/:date - Dohvati arhivu za datum`);
-  console.log(`  GET  /api/stats         - Statistike`);
-  console.log(`  POST /api/harvest       - Ručno pokretanje harvestera`);
-  console.log(`  GET  /api/dates         - Lokalno spremljeni datumi`);
+  // console.log(`\nAPI Endpointi:`);
+  // console.log(`  GET  /api/health        - Status servera`);
+  // console.log(`  GET  /api/archives      - Popis dostupnih arhiva s cijene.dev`);
+  // console.log(`  GET  /api/stores        - Lista trgovina`);
+  // console.log(`  GET  /api/latest        - Najnoviji lokalni podaci`);
+  // console.log(`  GET  /api/archive/:date - Dohvati arhivu za datum`);
+  // console.log(`  GET  /api/stats         - Statistike`);
+  // console.log(`  POST /api/harvest       - Ručno pokretanje harvestera`);
+  // console.log(`  GET  /api/dates         - Lokalno spremljeni datumi`);
 });

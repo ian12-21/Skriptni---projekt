@@ -208,6 +208,11 @@ export class AppComponent implements OnInit {
     this.message = `Eksportirano ${this.data.length} zapisa`;
   }
 
+  exportToJson(): void {
+    const filename = `data-${new Date().toISOString().split('T')[0]}.json`;
+    this.dataService.exportToJson(this.data, filename);
+  }
+
   formatDate(dateStr: string | null): string {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleString('hr-HR');
