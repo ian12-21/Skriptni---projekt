@@ -11,10 +11,10 @@
         ⏳ Preuzimanje u tijeku...
       </span>
       <span class="status-info" *ngIf="archiveDate">
-        📅 Podaci: {{ archiveDate }}
+        📅 Prikazani podaci: <strong>{{ archiveDate }}</strong>
       </span>
       <span class="status-info" *ngIf="harvesterStatus.lastResult && harvesterStatus.lastResult.records">
-        📊 {{ harvesterStatus.lastResult.records | number }} zapisa
+        📊 Zadnji harvest: {{ harvesterStatus.lastResult.records | number }} zapisa
       </span>
     </div>
   </header>
@@ -22,7 +22,7 @@
   <div class="controls">
     <div class="button-group">
       <button class="btn-primary" (click)="triggerHarvest()" [disabled]="loading">
-        {{ loading ? '⏳ Preuzimanje...' : '📥 Dohvati s cijene.dev' }}
+        {{ loading ? '⏳ Preuzimanje...' : '📥 Dohvati najnovije' }}
       </button>
       <button class="btn-secondary" (click)="loadData()" [disabled]="loading">
         🔄 Osvježi
@@ -31,21 +31,28 @@
         {{ showStats ? '📉 Sakrij statistike' : '📊 Statistike' }}
       </button>
       <button class="btn-purple" (click)="toggleArchives()">
-        {{ showArchives ? '📁 Sakrij arhive' : '📁 Dostupne arhive' }}
+        {{ showArchives ? '📁 Sakrij listu arhiva' : '📁 Lista arhiva (download)' }}
       </button>
       <button class="btn-success" (click)="exportCSV()" [disabled]="data.length === 0">
         💾 Export CSV
       </button>
-      <button (click)="exportToJson()" class="btn-success">📥 Export to JSON</button>
+      <button (click)="exportToJson()" class="btn-success" [disabled]="data.length === 0">
+        📥 Export JSON
+      </button>
     </div>
 
     <div class="filters">
       <div class="filter-row">
-        <div class="filter-group">
-          <label>Naziv proizvoda:</label>
-          <input type="text" [(ngModel)]="filterNaziv" placeholder="Pretraži..." (keyup.enter)="applyFilters()"/>
+        <div class="filter-group date-select">
+          <label>📅 Datum podataka:</label>
+          <select [(ngModel)]="selectedDate" (change)="onDateChange()" [disabled]="loading">
+            <option value="">✨ Najnovije (Lokalno)</option>
+            <option *ngFor="let arch of archives" [value]="arch.date">
+              {{ arch.date }} ({{ formatBytes(arch.size) }})
+            </option>
+          </select>
         </div>
-        
+
         <div class="filter-group">
           <label>Trgovina:</label>
           <select [(ngModel)]="filterTrgovina" (change)="applyFilters()">
@@ -53,10 +60,17 @@
             <option *ngFor="let t of trgovine" [value]="t">{{ t }}</option>
           </select>
         </div>
-        
+
+        <div class="filter-group">
+          <label>Naziv proizvoda:</label>
+          <input type="text" [(ngModel)]="filterNaziv" placeholder="Pretraži..." (keyup.enter)="applyFilters()" [disabled]="!!selectedDate" title="Pretraga po nazivu dostupna samo za najnovije podatke"/>
+        </div>
+      </div>
+      
+      <div class="filter-row">
         <div class="filter-group">
           <label>Kategorija:</label>
-          <select [(ngModel)]="filterKategorija" (change)="applyFilters()">
+          <select [(ngModel)]="filterKategorija" (change)="applyFilters()" [disabled]="!!selectedDate">
             <option value="">Sve kategorije</option>
             <option *ngFor="let k of kategorije" [value]="k">{{ k }}</option>
           </select>
@@ -64,35 +78,36 @@
         
         <div class="filter-group">
           <label>Brand:</label>
-          <input type="text" [(ngModel)]="filterBrand" placeholder="Marka..." (keyup.enter)="applyFilters()"/>
+          <input type="text" [(ngModel)]="filterBrand" placeholder="Marka..." (keyup.enter)="applyFilters()" [disabled]="!!selectedDate"/>
         </div>
-      </div>
-      
-      <div class="filter-row">
+
         <div class="filter-group small">
-          <label>Min cijena (€):</label>
-          <input type="number" [(ngModel)]="minCijena" placeholder="0" (keyup.enter)="applyFilters()"/>
+          <label>Min €:</label>
+          <input type="number" [(ngModel)]="minCijena" placeholder="0" (keyup.enter)="applyFilters()" [disabled]="!!selectedDate"/>
         </div>
         
         <div class="filter-group small">
-          <label>Max cijena (€):</label>
-          <input type="number" [(ngModel)]="maxCijena" placeholder="1000" (keyup.enter)="applyFilters()"/>
+          <label>Max €:</label>
+          <input type="number" [(ngModel)]="maxCijena" placeholder="1000" (keyup.enter)="applyFilters()" [disabled]="!!selectedDate"/>
         </div>
         
         <div class="filter-group">
           <label>Grad:</label>
-          <input type="text" [(ngModel)]="filterGrad" placeholder="Grad..." (keyup.enter)="applyFilters()"/>
+          <input type="text" [(ngModel)]="filterGrad" placeholder="Grad..." (keyup.enter)="applyFilters()" [disabled]="!!selectedDate"/>
         </div>
         
         <button class="btn-primary" (click)="applyFilters()" [disabled]="loading">🔍 Pretraži</button>
         <button class="btn-warning" (click)="clearFilters()" [disabled]="loading">✖ Očisti</button>
       </div>
+      
+      <div class="filter-note" *ngIf="selectedDate">
+        ℹ️ <em>Napomena: Za povijesne arhive dostupno je samo filtriranje po trgovini.</em>
+      </div>
     </div>
   </div>
 
-  <!-- Statistike -->
   <div class="stats-section" *ngIf="showStats && stats">
-    <h2>📊 Statistike</h2>
+    <h2>📊 Statistike {{ selectedDate ? '(' + selectedDate + ')' : '(Najnovije)' }}</h2>
     <div class="stats-grid">
       <div class="stat-card blue">
         <div class="stat-value">{{ stats.stats.totalRecords | number }}</div>
@@ -119,18 +134,10 @@
         <div class="stat-label">Kategorija</div>
       </div>
     </div>
-    
-    <div class="info-box" *ngIf="stats.availableDates && stats.availableDates.length > 0">
-      <h3>📅 Lokalno spremljeni datumi:</h3>
-      <div class="tags">
-        <span class="tag" *ngFor="let date of stats.availableDates">{{ date }}</span>
-      </div>
-    </div>
   </div>
 
-  <!-- Arhive -->
   <div class="archives-section" *ngIf="showArchives">
-    <h2>📁 Dostupne arhive na cijene.dev</h2>
+    <h2>📁 Dostupne arhive na cijene.dev (Download)</h2>
     <div class="archives-list" *ngIf="archives && archives.length > 0">
       <div class="archive-item" *ngFor="let archive of archives">
         <span class="archive-date">📅 {{ archive.date }}</span>
@@ -138,12 +145,17 @@
         <a [href]="archive.url" target="_blank" class="archive-link">⬇️ Preuzmi ZIP</a>
       </div>
     </div>
-    <div class="loading-text" *ngIf="!archives || archives.length === 0">Učitavanje...</div>
+    <div class="loading-text" *ngIf="!archives || archives.length === 0">Učitavanje liste arhiva...</div>
   </div>
 
   <div class="alert alert-success" *ngIf="message">✅ {{ message }}</div>
   <div class="alert alert-error" *ngIf="error">❌ {{ error }}</div>
-  <div class="loading-overlay" *ngIf="loading">⏳ Učitavanje podataka...</div>
+  <div class="loading-overlay" *ngIf="loading">
+    <div class="spinner"></div>
+    <div class="loading-text-overlay">
+      ⏳ {{ selectedDate ? 'Preuzimanje i obrada arhive...' : 'Učitavanje podataka...' }}
+    </div>
+  </div>
 
   <div class="data-section" *ngIf="!loading">
     <div class="data-header">
@@ -157,7 +169,8 @@
     </div>
     
     <div class="no-data" *ngIf="data.length === 0">
-      Nema podataka. Kliknite "Dohvati s cijene.dev" za preuzimanje.
+      <p>Nema podataka za prikaz.</p>
+      <p *ngIf="!selectedDate">Kliknite "Dohvati najnovije" za preuzimanje svježih podataka.</p>
     </div>
 
     <div class="table-container" *ngIf="data && data.length > 0">
@@ -178,7 +191,7 @@
         <tbody>
           <tr *ngFor="let item of data">
             <td class="naziv-cell" [title]="item.naziv">{{ item.naziv }}</td>
-            <td><span class="trgovina-badge">{{ item.trgovina }}</span></td>
+            <td><span class="trgovina-badge" [attr.data-store]="item.trgovina.toLowerCase()">{{ item.trgovina }}</span></td>
             <td>{{ item.kategorija }}</td>
             <td>{{ item.brand || '-' }}</td>
             <td class="cijena-cell">{{ formatCijena(item.cijena) }}</td>

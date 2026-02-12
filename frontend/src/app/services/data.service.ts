@@ -164,6 +164,14 @@ export class DataService {
     return this.http.get<any>(`${this.apiUrl}/dates`);
   }
 
+  getAvailableDates(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.apiUrl}/dates`);
+  }
+
+  getDataByDate(date: string): Observable<ApiResponse> {
+    return this.getArchive(date);
+  }
+
   // Legacy
   fetchData(): Observable<ApiResponse> {
     return this.http.get<ApiResponse>(`${this.apiUrl}/fetch-data`);

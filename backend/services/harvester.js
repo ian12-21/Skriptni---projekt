@@ -69,14 +69,27 @@ async function runHarvest(trgovinaFilter = null) {
 
 // Dohvaćanje arhive za određeni datum
 async function fetchArchiveByDate(date, trgovinaFilter = null) {
-  dataService.log('info', `Dohvaćanje arhive za datum: ${date}`);
+  dataService.log('info', `Traženje arhive za datum: ${date}`);
   
   try {
-    const zipBuffer = await dataService.downloadArchive(date);
+    // 1. Prvo moramo pronaći URL za taj datum
+    const archives = await dataService.fetchArchiveList();
+    const targetArchive = archives.find(a => a.date === date);
+
+    if (!targetArchive) {
+      throw new Error(`Nije pronađena arhiva za datum ${date}`);
+    }
+
+    dataService.log('info', `Pronađen URL za ${date}: ${targetArchive.url}`);
+
+    // 2. Preuzmi ZIP koristeći URL
+    const zipBuffer = await dataService.downloadArchive(targetArchive.url);
+    
+    // 3. Obradi
     const data = await dataService.extractAndProcessArchive(zipBuffer, trgovinaFilter);
     data.archiveDate = date;
     
-    dataService.log('info', `Arhiva dohvaćena za ${date}`, { records: data.combined.length });
+    dataService.log('info', `Arhiva dohvaćena i obrađena za ${date}`, { records: data.combined.length });
     
     return {
       success: true,

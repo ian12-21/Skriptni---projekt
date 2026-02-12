@@ -20,6 +20,7 @@ export class AppComponent implements OnInit {
   message = '';
   
   // Filteri
+  selectedDate: string = '';
   filterNaziv = '';
   filterTrgovina = '';
   filterKategorija = '';
@@ -44,7 +45,7 @@ export class AppComponent implements OnInit {
   
   // Harvester status
   harvesterStatus: HarvesterStatus | null = null;
-  archiveDate: string = '';
+  archiveDate: string = ''; // Datum podataka koji su trenutno prikazani
   
   // Dropdown opcije
   trgovine: string[] = [];
@@ -53,6 +54,7 @@ export class AppComponent implements OnInit {
   constructor(private dataService: DataService) {}
 
   ngOnInit() {
+    this.loadArchives(); // Odmah učitaj listu datuma za dropdown
     this.loadData();
     this.loadStats();
     this.loadHealth();
@@ -83,8 +85,11 @@ export class AppComponent implements OnInit {
         this.loading = false;
         if (response.success) {
           this.message = `✅ Uspješno dohvaćeno ${response.records} zapisa za datum ${response.archiveDate}`;
-          this.loadData();
-          this.loadStats();
+          // Ako smo na najnovijem datumu, osvježi prikaz
+          if (!this.selectedDate) {
+            this.loadData();
+            this.loadStats();
+          }
         } else {
           this.error = response.error || 'Nepoznata greška';
         }
@@ -96,42 +101,81 @@ export class AppComponent implements OnInit {
     });
   }
 
+  // Nova metoda za promjenu datuma
+  onDateChange() {
+    this.currentPage = 1;
+    this.loadData();
+  }
+
   loadData() {
     this.loading = true;
     this.error = '';
     
-    const filters = {
-      naziv: this.filterNaziv || undefined,
-      trgovina: this.filterTrgovina || undefined,
-      kategorija: this.filterKategorija || undefined,
-      brand: this.filterBrand || undefined,
-      grad: this.filterGrad || undefined,
-      minCijena: this.minCijena || undefined,
-      maxCijena: this.maxCijena || undefined,
-      page: this.currentPage,
-      limit: this.pageSize
-    };
-    
-    this.dataService.getLatest(filters).subscribe({
-      next: (response) => {
-        this.loading = false;
-        if (response.success) {
-          this.data = response.data;
-          this.totalRecords = response.totalCount;
-          this.totalPages = response.totalPages || 1;
-          this.archiveDate = response.archiveDate || '';
-          this.message = `Prikazano ${response.count} od ${response.totalCount} zapisa`;
+    // LOGIKA: Ako je odabran specifičan datum, koristi getArchive endpoint
+    if (this.selectedDate) {
+      // Napomena: Povijesni endpoint trenutno podržava samo filtriranje po trgovini
+      this.dataService.getArchive(
+        this.selectedDate, 
+        this.filterTrgovina || undefined, 
+        this.currentPage, 
+        this.pageSize
+      ).subscribe({
+        next: (response) => {
+          this.handleDataResponse(response);
+        },
+        error: (err) => {
+          this.handleError(err);
         }
-      },
-      error: (err) => {
-        this.loading = false;
-        this.error = err.error?.message || 'Greška pri učitavanju podataka';
-      }
-    });
+      });
+    } else {
+      // Inače koristi getLatest sa svim filterima
+      const filters = {
+        naziv: this.filterNaziv || undefined,
+        trgovina: this.filterTrgovina || undefined,
+        kategorija: this.filterKategorija || undefined,
+        brand: this.filterBrand || undefined,
+        grad: this.filterGrad || undefined,
+        minCijena: this.minCijena || undefined,
+        maxCijena: this.maxCijena || undefined,
+        page: this.currentPage,
+        limit: this.pageSize
+      };
+      
+      this.dataService.getLatest(filters).subscribe({
+        next: (response) => {
+          this.handleDataResponse(response);
+        },
+        error: (err) => {
+          this.handleError(err);
+        }
+      });
+    }
+  }
+
+  // Pomoćna metoda za obradu uspješnog odgovora
+  private handleDataResponse(response: any) {
+    this.loading = false;
+    if (response.success) {
+      this.data = response.data;
+      this.totalRecords = response.totalCount;
+      this.totalPages = response.totalPages || 1;
+      this.archiveDate = response.archiveDate || (this.selectedDate ? this.selectedDate : '');
+      
+      const sourceText = this.selectedDate ? `Arhiva (${this.selectedDate})` : 'Najnovije';
+      this.message = `[${sourceText}] Prikazano ${response.count} od ${response.totalCount} zapisa`;
+    }
+  }
+
+  // Pomoćna metoda za greške
+  private handleError(err: any) {
+    this.loading = false;
+    this.error = err.error?.message || 'Greška pri učitavanju podataka';
+    this.data = [];
   }
 
   loadStats() {
-    this.dataService.getStats().subscribe({
+    // Statistiku učitavamo za odabrani datum ako postoji, inače generalnu
+    this.dataService.getStats(this.selectedDate || undefined).subscribe({
       next: (response) => {
         if (response.success) {
           this.stats = response;
@@ -158,6 +202,9 @@ export class AppComponent implements OnInit {
 
   toggleStats() {
     this.showStats = !this.showStats;
+    if (this.showStats) {
+      this.loadStats(); // Osvježi statistiku kad se otvori
+    }
   }
 
   toggleArchives() {
@@ -168,6 +215,7 @@ export class AppComponent implements OnInit {
   }
 
   clearFilters() {
+    this.selectedDate = ''; // Reset datuma na "Najnovije"
     this.filterNaziv = '';
     this.filterTrgovina = '';
     this.filterKategorija = '';
@@ -177,6 +225,7 @@ export class AppComponent implements OnInit {
     this.maxCijena = null;
     this.currentPage = 1;
     this.loadData();
+    this.loadStats();
   }
 
   applyFilters() {
@@ -209,7 +258,7 @@ export class AppComponent implements OnInit {
   }
 
   exportToJson(): void {
-    const filename = `data-${new Date().toISOString().split('T')[0]}.json`;
+    const filename = `data-${this.archiveDate || new Date().toISOString().split('T')[0]}.json`;
     this.dataService.exportToJson(this.data, filename);
   }
 
